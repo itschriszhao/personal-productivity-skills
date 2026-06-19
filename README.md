@@ -22,9 +22,11 @@ git clone git@github.com:itschriszhao/personal-productivity-skills.git ~/persona
 
 ## 🧩 Skills
 
-> 直接被 AI 自动调用的指令集，丢在 `skills/<name>/SKILL.md` 即可。
+> 直接被 AI 自动调用的指令集。本仓内的 `skills/*`，以及子项目仓库里附带的 `skill/SKILL.md`。
 
-_（暂时空着，加一个填一行）_
+| Skill | 来源 | 用途 |
+|-------|------|------|
+| [obsidian-free-sync-setup](https://github.com/itschriszhao/obsidian-free-sync/blob/main/skill/SKILL.md) | 🪴 obsidian-free-sync | 自动配置 Obsidian + Git + GitHub 多设备同步 |
 
 ---
 

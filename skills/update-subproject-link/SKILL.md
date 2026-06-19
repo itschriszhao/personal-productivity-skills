@@ -1,17 +1,22 @@
 ---
 name: update-subproject-link
-description: 把一个 GitHub 子项目仓库链接追加到 personal-productivity-skills 的 README 「📦 子项目」表格里。当用户说"加到我的子项目"、"更新 personal 仓库的子项目列表"、"把这个仓库链接加到总仓 README"、"把 xxx 加到我的工具箱"、"register sub-repo"、"add to my productivity stash"，或提供 GitHub 仓库 URL 并表示要登记到总仓时触发。
+description: 把一个 GitHub 子项目仓库链接登记到 personal-productivity-skills 的 README——同时维护「📦 子项目」和「🧩 Skills」两张表（若子项目自带 skill/SKILL.md 则自动加进 Skills 表）。当用户说"加到我的子项目"、"更新 personal 仓库的子项目列表"、"把这个仓库链接加到总仓 README"、"把 xxx 加到我的工具箱"、"register sub-repo"、"add to my productivity stash"，或提供 GitHub 仓库 URL 并表示要登记到总仓时触发。
 ---
 
-# 更新 personal-productivity-skills 子项目列表
+# 更新 personal-productivity-skills 索引
 
-把指定的 GitHub 仓库登记到 `~/personal-productivity-skills/README.md` 「📦 子项目」表格中，自动 commit & push。
+把指定的 GitHub 仓库登记到 `~/personal-productivity-skills/README.md`：
+
+1. **📦 子项目** 表 — 必加一行
+2. **🧩 Skills** 表 — 若子项目根目录或 `skill/` 下存在 `SKILL.md`，自动加一行
+
+完成后 commit & push。
 
 ## 输入
 
-- **repo URL**：完整 GitHub 地址，形如 `https://github.com/<owner>/<name>` 或 SSH `git@github.com:<owner>/<name>.git`
-- **emoji**（可选）：表格首列前缀图标，默认 `📌`
-- **一句话简介**（可选）：若用户没给，主动用 GitHub API 抓 `description`，再让用户确认
+- **repo URL**：完整 GitHub 地址（HTTPS 或 SSH 任意）
+- **emoji**（可选，子项目表用）：默认 `📌`
+- **一句话简介**（可选）：未提供则自动 GitHub API 抓 `description` 让用户确认
 
 ## 执行流程
 
@@ -23,114 +28,161 @@ README="${REPO}/README.md"
 test -f "$README" || { echo "总仓 README 不存在: $README"; exit 1; }
 ```
 
+未 clone：提示用户 `git clone git@github.com:itschriszhao/personal-productivity-skills.git ~/personal-productivity-skills`。
+
 ### Step 2：解析 URL
 
-从输入提取 `<owner>/<name>`，并构造规范化 HTTPS 链接：`https://github.com/<owner>/<name>`。
+提取 `<owner>/<name>`，规范化 HTTPS：`https://github.com/<owner>/<name>`。
 
 ### Step 3：去重检查
 
 ```bash
-grep -F "github.com/<owner>/<name>" "$README" && {
-  echo "已存在，跳过追加"; exit 0;
-}
+grep -F "github.com/<owner>/<name>" "$README" && echo "已登记，是否更新？"
 ```
 
-如已存在，告知用户并询问是否要更新简介；不要重复追加行。
+已存在则询问用户是否覆盖；否则跳过。
 
-### Step 4：补全简介（可选）
+### Step 4：补全简介
 
-若用户没给简介，调用 GitHub API：
+未提供则：
 
 ```bash
-curl -s "https://api.github.com/repos/<owner>/<name>" | python3 -c "import sys,json; print(json.load(sys.stdin).get('description') or '')"
+curl -s "https://api.github.com/repos/<owner>/<name>" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('description') or '')"
 ```
 
-把抓到的 description 给用户看，问是否使用 / 修改。
+将抓到的内容给用户确认/编辑。私有仓库或限流则让用户手输。
 
-### Step 5：追加表格行
+### Step 5：探测子项目里的 SKILL.md
 
-README 里目标表格形如：
-
-```markdown
-## 📦 子项目
-
-| 项目 | 一句话 |
-|------|--------|
-| 🪴 [obsidian-free-sync](https://github.com/itschriszhao/obsidian-free-sync) | 用 GitHub 私仓免费同步 Obsidian，跨 Mac / 跨 Apple ID 都能用 |
-```
-
-用 Python 在表格末尾追加一行（避免 sed 处理 markdown 表格易出错）：
+调用 GitHub API 检查（不必 clone）：
 
 ```bash
-python3 <<'PY'
-from pathlib import Path
-import re, sys, os
+# 先看 skill/SKILL.md（推荐位置），再看根目录 SKILL.md
+SKILL_PATH=""
+for p in "skill/SKILL.md" "SKILL.md"; do
+  if curl -sf "https://api.github.com/repos/<owner>/<name>/contents/$p" -o /dev/null; then
+    SKILL_PATH="$p"; break
+  fi
+done
+```
 
-readme = Path(os.environ['README'])
-emoji  = os.environ.get('EMOJI', '📌')
-name   = os.environ['NAME']
-url    = os.environ['URL']
-desc   = os.environ['DESC']
+若找到，再抓出 `name` 和 `description`（frontmatter）：
 
-text = readme.read_text(encoding='utf-8')
-
-# 定位 ## 📦 子项目 ... 下一段（## 或 --- 或 EOF）
-pattern = re.compile(r'(## 📦 子项目\n\n\| 项目 \| 一句话 \|\n\|[^\n]*\|\n)((?:\|[^\n]*\|\n)*)', re.MULTILINE)
-m = pattern.search(text)
-if not m:
-    sys.exit("未找到「📦 子项目」表格，README 结构可能已变，需手动更新")
-
-new_row = f"| {emoji} [{name}]({url}) | {desc} |\n"
-new_text = text[:m.end()] + new_row + text[m.end():]
-# 防止重复
-if new_row in text:
-    print("行已存在，未改动"); sys.exit(0)
-readme.write_text(new_text, encoding='utf-8')
-print("已追加:", new_row.strip())
+```bash
+curl -sL "https://raw.githubusercontent.com/<owner>/<name>/main/$SKILL_PATH" | python3 <<'PY'
+import sys, re
+text = sys.stdin.read()
+m = re.search(r'^---\s*\n(.*?)\n---', text, re.S | re.M)
+if not m: sys.exit(0)
+fm = m.group(1)
+name = re.search(r'^name:\s*(.+)$', fm, re.M)
+desc = re.search(r'^description:\s*(.+)$', fm, re.M)
+print((name.group(1).strip() if name else '') + '\t' + (desc.group(1).strip() if desc else ''))
 PY
 ```
 
-调用方式：
+把 skill name 和一句话用途展示给用户确认。description 太长可裁到首句。
+
+### Step 6：写入 README（两张表）
+
+用 Python 在两张表末尾各追加一行：
 
 ```bash
-EMOJI="🪴" NAME="repo-name" URL="https://github.com/<owner>/<name>" DESC="一句话简介" README="$README" bash -c '...上面 python 块...'
+EMOJI="🪴" \
+PROJ_NAME="repo-name" \
+PROJ_URL="https://github.com/<owner>/<name>" \
+PROJ_DESC="一句话简介" \
+SKILL_NAME="skill-name-from-frontmatter" \
+SKILL_URL="https://github.com/<owner>/<name>/blob/main/<SKILL_PATH>" \
+SKILL_USAGE="一句话用途" \
+README="$README" \
+python3 <<'PY'
+import os, re, sys
+from pathlib import Path
+
+readme = Path(os.environ['README'])
+text = readme.read_text(encoding='utf-8')
+
+emoji      = os.environ.get('EMOJI', '📌')
+proj_name  = os.environ['PROJ_NAME']
+proj_url   = os.environ['PROJ_URL']
+proj_desc  = os.environ['PROJ_DESC']
+
+# ---- 1. 追加到「📦 子项目」表 ----
+proj_pat = re.compile(r'(## 📦 子项目\n\n\| 项目 \| 一句话 \|\n\|[^\n]*\|\n)((?:\|[^\n]*\|\n)*)', re.M)
+m = proj_pat.search(text)
+if not m:
+    sys.exit("未找到「📦 子项目」表，README 结构可能已变")
+proj_row = f"| {emoji} [{proj_name}]({proj_url}) | {proj_desc} |\n"
+if proj_row not in text:
+    text = text[:m.end()] + proj_row + text[m.end():]
+    print("加入子项目表:", proj_row.strip())
+
+# ---- 2. 若有 SKILL.md，追加到「🧩 Skills」表 ----
+skill_name  = os.environ.get('SKILL_NAME', '').strip()
+skill_url   = os.environ.get('SKILL_URL', '').strip()
+skill_usage = os.environ.get('SKILL_USAGE', '').strip()
+
+if skill_name and skill_url:
+    skill_pat = re.compile(
+        r'(## 🧩 Skills\n\n>[^\n]*\n\n\| Skill \| 来源 \| 用途 \|\n\|[^\n]*\|\n)((?:\|[^\n]*\|\n)*)',
+        re.M
+    )
+    m2 = skill_pat.search(text)
+    if not m2:
+        sys.exit("未找到「🧩 Skills」表，README 结构可能已变")
+    skill_row = f"| [{skill_name}]({skill_url}) | {emoji} {proj_name} | {skill_usage} |\n"
+    # 若 Skills 表里目前是占位行（含 "暂时空着"），整段替换
+    body = m2.group(2)
+    if '暂时空着' in body or body.strip() == '':
+        text = text[:m2.start(2)] + skill_row + text[m2.end(2):]
+    elif skill_row not in text:
+        text = text[:m2.end()] + skill_row + text[m2.end():]
+    print("加入 Skills 表:", skill_row.strip())
+
+readme.write_text(text, encoding='utf-8')
+PY
 ```
 
-### Step 6：展示 diff，等用户确认
+### Step 7：展示 diff，等用户确认
 
 ```bash
 cd "$REPO" && git diff README.md
 ```
 
-告诉用户改动内容，等用户回 "确认 / ok" 再继续。
-
-### Step 7：commit & push
+### Step 8：commit & push
 
 ```bash
 cd "$REPO"
 git add README.md
-git commit -m "docs: add <name> to sub-projects"
+git commit -m "docs: register <name> (sub-project + skill)"
+# 或仅子项目：docs: register <name> sub-project
 git push
 ```
 
-成功后回报 commit hash 和总仓 README 在线链接：
-`https://github.com/itschriszhao/personal-productivity-skills#-子项目`
+push 失败：`git pull --rebase && git push`，仍失败则停止报告。
 
 ## 异常处理
 
-- **总仓未 clone**：提示用户先 `git clone git@github.com:itschriszhao/personal-productivity-skills.git ~/personal-productivity-skills`
-- **表格结构被改过**：Step 5 的正则匹配失败，停止并请用户人工补一行
-- **GitHub API 限流**（403 / rate limit）：跳过自动抓简介，让用户手输
-- **push 被拒（远程有更新）**：执行 `git pull --rebase && git push`，仍失败则停止报告
-- **私有仓库 description 抓不到**：API 返回 404，让用户手输
+| 情况 | 处理 |
+|------|------|
+| 总仓未 clone | 提示 clone 命令后停止 |
+| 表格结构被改 | 正则匹配失败，停止报告，让用户人工补 |
+| GitHub API 限流（403） | 跳过自动抓简介与 SKILL frontmatter，让用户手输 |
+| 私有仓库 description 抓不到 | API 404，让用户手输 |
+| 子项目无 SKILL.md | 跳过 Skills 表，仅更新子项目表 |
+| Skills 表当前是占位（含"暂时空着"） | 用新行**替换**整段表体，而非追加 |
+| push 被拒 | `git pull --rebase` 后重试 |
 
 ## 完成回报格式
 
 ```
 ✅ 已更新 personal-productivity-skills
 
-新增：🪴 obsidian-free-sync
-简介：用 GitHub 私仓免费同步 Obsidian
-commit：a2ca0f5
+📦 子项目 + 🧩 Skill：🪴 obsidian-free-sync / obsidian-free-sync-setup
+commit：1831d31
 查看：https://github.com/itschriszhao/personal-productivity-skills#-子项目
 ```
+
+仅子项目无 Skill 时，省略「🧩 Skill」一行。
