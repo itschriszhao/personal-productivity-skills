@@ -33,6 +33,7 @@ _（暂时空着，加一个填一行）_
 | 项目 | 一句话 |
 |------|--------|
 | 🪴 [obsidian-free-sync](https://github.com/itschriszhao/obsidian-free-sync) | 用 GitHub 私仓免费同步 Obsidian，跨 Mac / 跨 Apple ID 都能用 |
+| 🎨 [10-dribbble-vibes](https://github.com/itschriszhao/10-dribbble-vibes) | 10 套高审美单文件 HTML 模板，丢给 AI Agent 一键采用配色与布局 |
 
 ---
 
