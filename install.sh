@@ -12,7 +12,7 @@ DRY_RUN=0
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_SRC="${REPO_DIR}/skills"
-SKILLS_DST="${SKILLS_DST:-${HOME}/.skills}"
+SKILLS_DST="${SKILLS_DST:-${HOME}/.comate/skills}"
 
 if [[ ! -d "$SKILLS_SRC" ]]; then
   echo "[install] no skills/ directory found at $SKILLS_SRC, nothing to do."
