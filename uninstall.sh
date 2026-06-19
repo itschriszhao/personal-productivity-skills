@@ -4,7 +4,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_SRC="${REPO_DIR}/skills"
-SKILLS_DST="${HOME}/.comate/skills"
+SKILLS_DST="${SKILLS_DST:-${HOME}/.skills}"
 
 removed=0
 for dir in "$SKILLS_SRC"/*/; do

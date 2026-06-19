@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# install.sh — link skills/* into ~/.comate/skills/
+# install.sh — link skills/* into your AI agent's skills directory
 # Usage:
-#   ./install.sh           # install (idempotent)
-#   ./install.sh --dry-run # preview only
+#   ./install.sh                              # install (idempotent)
+#   ./install.sh --dry-run                    # preview only
+#   SKILLS_DST=~/.claude/skills ./install.sh  # override target dir
 
 set -euo pipefail
 
@@ -11,7 +12,7 @@ DRY_RUN=0
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_SRC="${REPO_DIR}/skills"
-SKILLS_DST="${HOME}/.comate/skills"
+SKILLS_DST="${SKILLS_DST:-${HOME}/.skills}"
 
 if [[ ! -d "$SKILLS_SRC" ]]; then
   echo "[install] no skills/ directory found at $SKILLS_SRC, nothing to do."
